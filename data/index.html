@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Score System</title>
+<style>
+body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;}
+.wrap{text-align:center;width:100%;}
+.teams{font-size:32px;margin-bottom:18px;}
+.name-input{font-size:32px;background:#222;color:#fff;border:1px solid #555;border-radius:8px;padding:6px 12px;width:220px;text-align:center;}
+.vs{display:inline-block;margin:0 14px;color:#aaa;}
+.total{font-size:120px;font-weight:700;line-height:1;margin-bottom:28px;}
+.judge{font-size:20px;color:#bbb;line-height:1.8;}
+.actions{margin:22px 0;}
+.btn-reset{font-size:18px;background:#c62828;color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;}
+.btn-reset:hover{background:#b71c1c;}
+</style>
+</head>
+<body>
+<div class='wrap'>
+  <div class='teams'>
+    <input id='nameA' class='name-input' value="%TEAM_A%">
+    <span class='vs'>vs</span>
+    <input id='nameB' class='name-input' value="%TEAM_B%">
+  </div>
+  <div id='totalScore' class='total'>0 : 0</div>
+  <div class='actions'><button id='resetTotalBtn' class='btn-reset'>重置总比分</button></div>
+  <div id='judge_client1' class='judge'>裁判1 (client1): 0 : 0</div>
+  <div id='judge_client2' class='judge'>裁判2 (client2): 0 : 0</div>
+  <div id='judge_client3' class='judge'>裁判3 (client3): 0 : 0</div>
+</div>
+<script>
+let saveTimer = null;
+
+async function refreshScores() {
+  try {
+    const resp = await fetch('/score');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById('totalScore').textContent = data.totalA + ' : ' + data.totalB;
+    for (const j of data.judges) {
+      const el = document.getElementById('judge_' + j.id);
+      if (!el) continue;
+      let title = '裁判';
+      if (j.id === 'client1') title = '裁判1';
+      else if (j.id === 'client2') title = '裁判2';
+      else if (j.id === 'client3') title = '裁判3';
+      el.textContent = title + ' (' + j.id + '): ' + j.scoreA + ' : ' + j.scoreB;
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function saveNames() {
+  try {
+    const a = document.getElementById('nameA').value;
+    const b = document.getElementById('nameB').value;
+    await fetch('/setNames?a=' + encodeURIComponent(a) + '&b=' + encodeURIComponent(b), { method: 'POST' });
+  } catch (e) { console.error(e); }
+}
+
+function queueSaveNames() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNames, 300);
+}
+
+window.addEventListener('load', () => {
+  document.getElementById('nameA').addEventListener('input', queueSaveNames);
+  document.getElementById('nameB').addEventListener('input', queueSaveNames);
+  document.getElementById('resetTotalBtn').addEventListener('click', async () => {
+    try {
+      await fetch('/resetTotal', { method: 'POST' });
+      await refreshScores();
+    } catch (e) { console.error(e); }
+  });
+});
+
+refreshScores();
+setInterval(refreshScores, 500);
+</script>
+</body>
+</html>
