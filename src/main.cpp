@@ -92,6 +92,15 @@ void resetRound() {
     }
 }
 
+void resetClientScores() {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].active) {
+            clients[i].scoreA = 0;
+            clients[i].scoreB = 0;
+        }
+    }
+}
+
 // 网页内容
 String getHTML() {
     File file = LittleFS.open("/index.html", "r");
@@ -139,8 +148,10 @@ void handleSetNames() {
 void handleResetTotal() {
     totalScoreA = 0;
     totalScoreB = 0;
+    resetRound();
+    resetClientScores();
 
-    Serial.println("Total score reset from web button");
+    Serial.println("Total score and judge scores reset from web button");
 
     String json = "{\"ok\":true}";
     server.send(200, "application/json", json);

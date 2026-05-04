@@ -25,10 +25,10 @@ body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;min
     <input id='nameB' class='name-input' value="%TEAM_B%">
   </div>
   <div id='totalScore' class='total'>0 : 0</div>
-  <div class='actions'><button id='resetTotalBtn' class='btn-reset'>重置总比分</button></div>
-  <div id='judge_client1' class='judge'>裁判1 (client1): 0 : 0</div>
-  <div id='judge_client2' class='judge'>裁判2 (client2): 0 : 0</div>
-  <div id='judge_client3' class='judge'>裁判3 (client3): 0 : 0</div>
+  <div class='actions'><button id='resetTotalBtn' class='btn-reset'>重置比分</button></div>
+  <div id='judge_client1' class='judge'>裁判1 0 : 0</div>
+  <div id='judge_client2' class='judge'>裁判2 0 : 0</div>
+  <div id='judge_client3' class='judge'>裁判3 0 : 0</div>
 </div>
 <script>
 let saveTimer = null;
@@ -46,7 +46,7 @@ async function refreshScores() {
       if (j.id === 'client1') title = '裁判1';
       else if (j.id === 'client2') title = '裁判2';
       else if (j.id === 'client3') title = '裁判3';
-      el.textContent = title + ' (' + j.id + '): ' + j.scoreA + ' : ' + j.scoreB;
+      el.textContent = title + '  ------  ' + j.scoreA + ' : ' + j.scoreB;
     }
   } catch (e) { console.error(e); }
 }
