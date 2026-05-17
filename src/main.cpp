@@ -35,6 +35,23 @@ unsigned long roundId = 1;
 String teamAName = "Player A";
 String teamBName = "Player B";
 
+unsigned long countdownEndMs = 0;
+bool countdownActive = false;
+int countdownDuration = 0;
+
+String jsonEscape(const String& value) {
+    String escaped;
+    escaped.reserve(value.length() + 8);
+    for (size_t i = 0; i < value.length(); i++) {
+        char c = value[i];
+        if (c == '\\' || c == '"') {
+            escaped += '\\';
+        }
+        escaped += c;
+    }
+    return escaped;
+}
+
 int findOrCreateClient(const String& clientId) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].active && clients[i].clientId == clientId) {
@@ -104,6 +121,28 @@ void openNextRound() {
     roundId++;
 }
 
+long getCountdownRemainingMs() {
+    if (!countdownActive) return 0;
+    long remaining = (long)(countdownEndMs - millis());
+    if (remaining <= 0) {
+        countdownActive = false;
+        return 0;
+    }
+    return remaining;
+}
+
+void startCountdown(int seconds) {
+    countdownDuration = seconds;
+    countdownEndMs = millis() + (unsigned long)seconds * 1000UL;
+    countdownActive = true;
+}
+
+void stopCountdown() {
+    countdownActive = false;
+    countdownEndMs = 0;
+    countdownDuration = 0;
+}
+
 String getHTML(const char* path) {
     File file = LittleFS.open(path, "r");
     if (!file) {
@@ -137,10 +176,16 @@ void handleScore() {
                       ",\"submitted\":" + String(roundSubmitted[i] ? "true" : "false") + "}";
     }
 
-    String json = "{\"totalA\":" + String(totalScoreA) +
+    long remainingMs = getCountdownRemainingMs();
+    String json = "{\"teamA\":\"" + jsonEscape(teamAName) +
+                  "\",\"teamB\":\"" + jsonEscape(teamBName) +
+                  "\",\"totalA\":" + String(totalScoreA) +
                   ",\"totalB\":" + String(totalScoreB) +
                   ",\"roundOpen\":" + String(roundOpen ? "true" : "false") +
                   ",\"roundId\":" + String(roundId) +
+                  ",\"countdownActive\":" + String(countdownActive ? "true" : "false") +
+                  ",\"countdownRemainingMs\":" + String(remainingMs) +
+                  ",\"countdownDuration\":" + String(countdownDuration) +
                   ",\"judges\":[" + judgesJson + "]}";
     server.send(200, "application/json", json);
 }
@@ -170,6 +215,27 @@ void handleSetNames() {
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
+void handleSyncDisplay() {
+    if (server.hasArg("a")) {
+        teamAName = server.arg("a");
+    }
+    if (server.hasArg("b")) {
+        teamBName = server.arg("b");
+    }
+    if (server.hasArg("totalA")) {
+        totalScoreA = server.arg("totalA").toInt();
+    }
+    if (server.hasArg("totalB")) {
+        totalScoreB = server.arg("totalB").toInt();
+    }
+
+    String json = "{\"ok\":true,\"teamA\":\"" + jsonEscape(teamAName) +
+                  "\",\"teamB\":\"" + jsonEscape(teamBName) +
+                  "\",\"totalA\":" + String(totalScoreA) +
+                  ",\"totalB\":" + String(totalScoreB) + "}";
+    server.send(200, "application/json", json);
+}
+
 void handleResetTotal() {
     totalScoreA = 0;
     totalScoreB = 0;
@@ -177,6 +243,7 @@ void handleResetTotal() {
     resetClientScores();
     roundOpen = true;
     roundId++;
+    stopCountdown();
 
     Serial.println("Total score and judge scores reset from web button");
     String json = "{\"ok\":true,\"roundId\":" + String(roundId) + "}";
@@ -185,10 +252,26 @@ void handleResetTotal() {
 
 void handleNextRound() {
     openNextRound();
+
+    int seconds = 0;
+    if (server.hasArg("seconds")) {
+        seconds = server.arg("seconds").toInt();
+    }
+    if (seconds > 0) {
+        startCountdown(seconds);
+        Serial.print("Countdown started: ");
+        Serial.print(seconds);
+        Serial.println("s");
+    } else {
+        stopCountdown();
+    }
+
     Serial.print("Next round opened, roundId=");
     Serial.println(roundId);
 
-    String json = "{\"ok\":true,\"roundId\":" + String(roundId) + "}";
+    String json = "{\"ok\":true,\"roundId\":" + String(roundId) +
+                  ",\"countdownActive\":" + String(countdownActive ? "true" : "false") +
+                  ",\"countdownDuration\":" + String(countdownDuration) + "}";
     server.send(200, "application/json", json);
 }
 
@@ -275,7 +358,8 @@ void setup() {
     resetRound();
 
     WiFi.mode(WIFI_AP);
-    WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    // WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.softAP(ssid, password);
 
     Serial.println("WiFi started");
@@ -286,6 +370,7 @@ void setup() {
     server.on("/score", handleScore);
     server.on("/roundStatus", handleRoundStatus);
     server.on("/setNames", HTTP_POST, handleSetNames);
+    server.on("/syncDisplay", HTTP_POST, handleSyncDisplay);
     server.on("/nextRound", HTTP_POST, handleNextRound);
     server.on("/resetTotal", HTTP_POST, handleResetTotal);
     server.on("/updateScore", handleUpdateScore);

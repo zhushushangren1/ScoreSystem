@@ -7,10 +7,13 @@
 <style>
 body{margin:0;font-family:sans-serif;background:radial-gradient(circle at top,#202020,#080808 70%);color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;}
 .wrap{text-align:center;width:min(1000px,92vw);}
-.teams{display:flex;align-items:center;justify-content:center;gap:28px;font-size:clamp(28px,4vw,56px);font-weight:700;letter-spacing:1px;margin-bottom:24px;}
-.team{padding:14px 20px;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.05);min-width:220px;}
-.vs{font-size:clamp(18px,2vw,28px);color:#bbb;text-transform:uppercase;letter-spacing:4px;}
-.total{font-size:clamp(84px,18vw,240px);font-weight:800;line-height:1;letter-spacing:4px;}
+.teams{display:flex;align-items:center;justify-content:center;gap:28px;font-size:48px;font-weight:700;margin-bottom:24px;}
+.team{padding:14px 20px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.05);min-width:220px;}
+.vs{font-size:24px;color:#bbb;text-transform:uppercase;letter-spacing:4px;}
+.countdown{font-size:120px;font-weight:800;letter-spacing:8px;color:#ffeb3b;margin-bottom:18px;font-variant-numeric:tabular-nums;display:none;}
+.countdown.warn{color:#ff5252;}
+.total{font-size:160px;font-weight:800;line-height:1;letter-spacing:4px;}
+@media (max-width:700px){.teams{font-size:28px;gap:12px;flex-wrap:wrap}.team{min-width:120px}.total{font-size:84px}.countdown{font-size:64px;letter-spacing:4px;}}
 </style>
 </head>
 <body>
@@ -20,15 +23,42 @@ body{margin:0;font-family:sans-serif;background:radial-gradient(circle at top,#2
     <div class="vs">vs</div>
     <div id="teamB" class="team">%TEAM_B%</div>
   </div>
+  <div id="countdown" class="countdown">00:00</div>
   <div id="totalScore" class="total">0 : 0</div>
 </div>
 <script>
+let countdownActive = false;
+let countdownEndAt = 0;
+
+function renderCountdown() {
+  const box = document.getElementById('countdown');
+  if (!countdownActive) {
+    box.style.display = 'none';
+    return;
+  }
+  const remainingMs = Math.max(0, countdownEndAt - Date.now());
+  const totalSec = Math.ceil(remainingMs / 1000);
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const ss = String(totalSec % 60).padStart(2, '0');
+  box.textContent = mm + ':' + ss;
+  box.style.display = 'block';
+  box.classList.toggle('warn', totalSec <= 10);
+}
+
 async function refreshScores() {
   try {
     const resp = await fetch('/score');
     if (!resp.ok) return;
     const data = await resp.json();
+    document.getElementById('teamA').textContent = data.teamA;
+    document.getElementById('teamB').textContent = data.teamB;
     document.getElementById('totalScore').textContent = data.totalA + ' : ' + data.totalB;
+
+    countdownActive = !!data.countdownActive;
+    if (countdownActive) {
+      countdownEndAt = Date.now() + (data.countdownRemainingMs || 0);
+    }
+    renderCountdown();
   } catch (e) {
     console.error(e);
   }
@@ -36,6 +66,7 @@ async function refreshScores() {
 
 refreshScores();
 setInterval(refreshScores, 500);
+setInterval(renderCountdown, 200);
 </script>
 </body>
 </html>
